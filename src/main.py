@@ -18,7 +18,7 @@ from src.config import (
     ENABLE_IMAGE_GENERATION,
     GITHUB_PAGES_URL
 )
-from src.rss_fetcher import RSSFetcher
+from src.brave_fetcher import BraveFetcher
 from src.claude_analyzer import ClaudeAnalyzer
 from src.html_generator import HTMLGenerator
 from src.notifier import EmailNotifier
@@ -34,7 +34,7 @@ def print_banner():
 ║                                                              ║
 ║   AI Daily - AI 資訊日報自動生成器                          ║
 ║                                                              ║
-║   自動獲取 smol.ai 資訊 · Claude 智能分析                   ║
+║   自動獲取全球重點新聞 · Claude 智能分析                    ║
 ║   精美 HTML 頁面 · 自動部署                                 ║
 ║                                                              ║
 ╚════════════════════════════════════════════════════════════╝
@@ -83,28 +83,29 @@ def main():
         print(f"   (北京時間: {datetime.now(timezone.utc) + timedelta(hours=8)} + 8h)")
         print()
 
-        # 2. 下載並解析 RSS
-        print(f"[步驟 1/{total_steps}] 下載 RSS...")
-        fetcher = RSSFetcher()
-        rss_data = fetcher.fetch()
+        # 2. 獲取資訊 (使用 Brave Search)
+        print(f"[步驟 1/{total_steps}] 透過 Brave 獲取最新全球新聞...")
+        fetcher = BraveFetcher()
+            
+        fetched_data = fetcher.fetch()
 
-        # 顯示 RSS 信息
-        date_range = fetcher.get_date_range(rss_data)
+        # 顯示日期範圍資訊
+        date_range = fetcher.get_date_range(fetched_data)
         if date_range[0] and date_range[1]:
-            print(f"   RSS 日期範圍: {date_range[0]} ~ {date_range[1]}")
+            print(f"   來源搜尋/日期範圍: {date_range[0]} ~ {date_range[1]}")
         print()
 
         # 3. 查找目標日期的內容
-        print(f"[步驟 2/{total_steps}] 查找目標日期的資訊...")
-        content = fetcher.get_content_by_date(target_date, rss_data)
+        print(f"[步驟 2/{total_steps}] 整理目標日期的資訊內容...")
+        content = fetcher.get_content_by_date(target_date, fetched_data)
 
         if not content:
             print("   目標日期無內容，生成空頁面")
             if email_enabled:
                 notifier.send_empty(
                     target_date,
-                    f"RSS 中未找到 {target_date} 的資訊內容。"
-                    f"RSS 可用日期範圍: {date_range[0]} ~ {date_range[1]}"
+                    f"未找到 {target_date} 的全球新聞內容。"
+                    f"可分析的日期範圍: {date_range[0]} ~ {date_range[1]}"
                 )
 
             # 生成空頁面

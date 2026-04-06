@@ -17,10 +17,10 @@ CLAUDE_MODEL = os.getenv("CLAUDE_MODEL", "claude-3-5-sonnet-20241022")
 CLAUDE_MAX_TOKENS = 8192
 
 # ============================================================================
-# RSS 配置
+# Brave Search API 配置
 # ============================================================================
-RSS_URL = os.getenv("RSS_URL", "https://news.smol.ai/rss.xml")
-RSS_TIMEOUT = 30  # 秒
+BRAVE_API_KEY = os.getenv("BRAVE_API_KEY", "")
+BRAVE_SEARCH_QUERY = os.getenv("BRAVE_SEARCH_QUERY", "top trending global news")
 
 # ============================================================================
 # 輸出配置
