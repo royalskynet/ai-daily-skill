@@ -1,17 +1,12 @@
 """
 Claude 分析模塊
-使用 Claude API 對資訊內容進行智能分析、分類和摘要
+使用 Claude CLI (claude -p) 對資訊內容進行智能分析、分類和摘要
 """
-import os
 import json
+import subprocess
 from typing import Dict, Any, Optional
-from anthropic import Anthropic
 
 from src.config import (
-    ANTHROPIC_BASE_URL,
-    CLAUDE_API_KEY,
-    CLAUDE_MODEL,
-    CLAUDE_MAX_TOKENS,
     CATEGORIES,
     THEMES,
     DEFAULT_THEME
@@ -19,34 +14,10 @@ from src.config import (
 
 
 class ClaudeAnalyzer:
-    """Claude AI 分析器"""
+    """Claude AI 分析器（透過 Claude Code CLI）"""
 
     def __init__(self, api_key: str = None, base_url: str = None):
-        """
-        初始化 Claude 客戶端
-
-        Args:
-            api_key: API 密鑰，默認從環境變量讀取
-            base_url: API 基礎 URL，默認從環境變量讀取
-        """
-        self.api_key = api_key or CLAUDE_API_KEY
-        self.base_url = base_url or ANTHROPIC_BASE_URL
-        self.model = CLAUDE_MODEL
-        self.max_tokens = CLAUDE_MAX_TOKENS
-
-        if not self.api_key:
-            raise ValueError("CLAUDE_API_KEY 環境變量未設置")
-
-        try:
-            self.client = Anthropic(
-                base_url=self.base_url,
-                api_key=self.api_key
-            )
-            print(f"✅ Claude 客戶端初始化成功")
-            print(f"   Base URL: {self.base_url}")
-            print(f"   Model: {self.model}")
-        except Exception as e:
-            raise Exception(f"Claude 客戶端初始化失敗: {e}")
+        print(f"✅ Claude 分析器初始化成功（使用 claude CLI）")
 
     def analyze(self, content: Dict[str, Any], target_date: str) -> Dict[str, Any]:
         """
@@ -74,21 +45,21 @@ class ClaudeAnalyzer:
         prompt = self._build_prompt(content, target_date)
 
         try:
-            # 調用 Claude API
-            response = self.client.messages.create(
-                model=self.model,
-                max_tokens=self.max_tokens,
-                temperature=0.3,  # 較低溫度保證穩定性
-                messages=[
-                    {
-                        "role": "user",
-                        "content": prompt
-                    }
-                ]
+            # 透過 claude CLI 呼叫（Windows 需用 .cmd）
+            import sys as _sys
+            claude_cmd = "claude.cmd" if _sys.platform == "win32" else "claude"
+            result = subprocess.run(
+                [claude_cmd, "-p"],
+                input=prompt,
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                timeout=300
             )
+            if result.returncode != 0:
+                raise Exception(f"claude CLI 錯誤: {result.stderr.strip()}")
 
-            # 解析響應
-            result_text = response.content[0].text
+            result_text = result.stdout.strip()
             print(f"✅ Claude 響應成功，響應長度: {len(result_text)} 字符")
 
             # 解析 JSON 結果
@@ -107,7 +78,7 @@ class ClaudeAnalyzer:
                     "AI 資訊分析遇到技術問題，以下是原始內容摘要",
                     f"標題: {content.get('title', '')[:100]}..."
                 ],
-                "keywords": ["AI", "資訊"],
+                "keywords": ["全球新聞", "熱點"],
                 "categories": self._fallback_categories(content),
                 "raw_content": content
             }
@@ -126,7 +97,7 @@ class ClaudeAnalyzer:
             for key, theme in THEMES.items()
         ])
 
-        prompt = f"""你是一個專業的 AI 資訊分析師，請對以下 AI 日報內容進行深度分析。
+        prompt = f"""你是一個專業的全球新聞分析師與資深編輯，請對以下熱門新聞內容進行深度分析與摘要。
 
 【目標日期】
 {target_date}
@@ -142,24 +113,31 @@ class ClaudeAnalyzer:
 
 【任務要求】
 
-0. **內容過濾**
-   - 請嚴格排除任何來自中國大陸及臺灣媒體的新聞來源或相關報導，若判斷為相關內容請直接丟棄該條資訊。
+0. **新聞配比與時效要求 (重要)**
+   - **時效上限**：**絕對禁止** 包含發布超過 **72 小時 (3 天)** 的新聞。
+   - **配比目標**：
+     - **1 則**：臺灣 (Taiwan) 相關國際新聞 (限 72h 內)。
+     - **2 則**：加密貨幣/區塊鏈監管 (限 72h 內)。
+     - **2 則**：經濟財經 (Finance) (限 72h 內)。
+     - **5 則**：國際要聞 (World News) (限 72h 內)。
+   - **彈性規則**：若某個特定分類（如臺灣、加密監管）在 72 小時內**查無具價值的新聞**，請**直接跳過或不列出**該分類。**寧缺勿濫**，不要用舊聞或無關新聞湊數。總量上限為 10 則。
+   - **來源過濾**：嚴格排除來自 **中國大陸** 與 **臺灣本地** 的媒體報導。
 
 1. **狀態檢查**
    - 如果內容確實存在且有效，返回狀態為 "success"
    - 如果內容為空或無效，返回狀態為 "empty"
 
 2. **核心摘要** (summary)
-   - 生成 3-5 條今日最重要的 AI 資訊要點
+   - 生成 3-5 條今日全球最重要的熱點資訊要點
    - 每條摘要不超過 50 字，簡潔明了
    - 按重要性排序
 
 3. **智能分類** (categories)
-   將資訊按以下維度分類（可空）:
+   將資訊按以下維度分類（請確保 items 總合為 10 則）:
 {category_desc}
 
    每個分類包含:
-   - key: 分類標識 (model/product/research/tools/funding/events)
+   - key: 分類標識 (world/finance/tech/lifestyle/sports/entertainment)
    - name: 分類名稱
    - icon: 分類圖標
    - items: 該分類下的資訊列表
@@ -168,11 +146,12 @@ class ClaudeAnalyzer:
    - title: 簡化版標題（適合快速瀏覽，不超過40字）
    - summary: 一句話核心要點（不超過80字）
    - url: 相關連結（如果有的話）
-   - tags: 相關標籤（如公司名、產品名）
+   - date: 發布時間（如 "2 hours ago", "1 day ago"）
+   - tags: 相關標籤（如國家名、公司名、人物名）
 
 4. **關鍵詞提取** (keywords)
    - 提取 5-10 個今日熱門關鍵詞
-   - 包括: 公司名稱、人物、技術名詞、產品名
+   - 包括: 國家/地區名、人物、重大事件名稱、公司名
    - 去重並按重要性排序
 
 5. **主題選擇** (theme)
@@ -211,10 +190,11 @@ class ClaudeAnalyzer:
       "icon": "🤖",
       "items": [
         {{
-          "title": "MedGemma 1.5 發布",
-          "summary": "Google 發布 4B 參數醫療多模態模型，支持 3D 影像分析",
-          "url": "https://news.smol.ai/issues/26-01-13-not-much/",
-          "tags": ["Google", "MedGemma", "醫療AI"]
+          "title": "伊朗拒絕停火提議",
+          "summary": "德黑蘭方面表示在川普最後通牒期限屆滿前，已明確拒絕目前的停火協議方案。",
+          "url": "https://example.com/world-news-1",
+          "date": "4 hours ago",
+          "tags": ["伊朗", "美國", "國際局勢"]
         }}
       ]
     }},
@@ -278,8 +258,8 @@ class ClaudeAnalyzer:
                 "status": "success",
                 "date": target_date,
                 "theme": DEFAULT_THEME,
-                "summary": ["AI 資訊已獲取"],
-                "keywords": ["AI"],
+                "summary": ["全球新聞資訊已獲取"],
+                "keywords": ["新聞"],
                 "categories": [],
                 "parse_error": str(e)
             }
@@ -305,15 +285,15 @@ class ClaudeAnalyzer:
 
         return [
             {
-                "key": "model",
-                "name": "模型發布",
-                "icon": "🤖",
+                "key": "world",
+                "name": "國際要聞",
+                "icon": "🌎",
                 "items": [
                     {
                         "title": title,
                         "summary": description,
                         "url": url,
-                        "tags": ["AI"]
+                        "tags": ["新聞"]
                     }
                 ]
             }

@@ -32,9 +32,9 @@ class BraveFetcher:
         params = {
             "q": self.query,
             "count": 50,           # 提升抓取數量以供後續嚴格時間過濾
-            "freshness": "pd",     # 過去 24 小時內 (past day)
+            "freshness": "pw",     # 抓取過去一週以滿足 72 小時需求
             "search_lang": "en",   # 確保抓取英文原版全球新聞
-            "extra_snippets": 1    # 獲取更多摘要內容
+            "extra_snippets": 1    # 仍抓取但後續過濾時精簡使用
         }
 
         try:
@@ -74,47 +74,60 @@ class BraveFetcher:
             print("❌ 未從 Brave Search 獲取到任何新聞結果")
             return None
 
-        # 嚴格過濾 24 小時內的新聞
+        # 嚴格過濾 72 小時 (3 天) 內的新聞並排序
         recent_results = []
         for item in all_results:
             age = str(item.get("age", "")).lower()
             if not age:
                 continue
                 
-            # 判斷是否為「24小時內」:
+            # 判斷是否為「72小時 (3天) 內」:
             # - 包含 mins, min, secs, sec, hours, hour
-            # - 或是 1 day (排除 2 days, 3 days 等)
+            # - 或是 1 day, 2 days, 3 days
             is_recent = False
             if any(x in age for x in ["min", "sec", "hour"]):
                 is_recent = True
-            elif "1 day" in age and "days" not in age:
+            elif any(x in age for x in ["1 day", "2 days", "3 days"]):
                 is_recent = True
                 
             if is_recent:
                 recent_results.append(item)
-                
-        # 提取過濾後的前 15 條，若都被過濾掉則至少回傳原本拿到的最前面結果作為保底
-        results = recent_results[:15] if recent_results else all_results[:15]
         
-        print(f"🔍 經過嚴格 24 小時時間過濾，最終提取 {len(results)} 條新聞送交分析。")
+        # 排序：解析 age 字串，越新的在最前面
+        def parse_age_to_minutes(age_str):
+            age_str = age_str.lower()
+            import re
+            match = re.search(r"(\d+)\s*(min|hour|day|sec)", age_str)
+            if not match: return 999999
+            val = int(match.group(1))
+            unit = match.group(2)
+            if "sec" in unit: return val / 60
+            if "min" in unit: return val
+            if "hour" in unit: return val * 60
+            if "day" in unit: return val * 1440
+            return 999999
 
-        # 組合所有的 snippets 成為一整大段文字
+        recent_results.sort(key=lambda x: parse_age_to_minutes(str(x.get("age", ""))))
+                
+        # 提取前 20 則 (減少內容體積)
+        results = recent_results[:20] if recent_results else all_results[:20]
+        
+        print(f"🔍 經過 72 小時過濾與排序，最終提取 {len(results)} 則精簡資料送交分析。")
+
+        # 組合極簡內容以節省 Token
         combined_content = ""
         for i, item in enumerate(results, 1):
             title = item.get("title", "")
             url = item.get("url", "")
-            desc = item.get("description", "")
-            source = item.get("meta_url", {}).get("hostname", "Unknown Source")
+            # 僅保留極簡摘要以節省 Token
+            desc = item.get("description", "")[:250]
+            age = item.get("age", "N/A")
+            source = item.get("meta_url", {}).get("hostname", "Unknown")
             
-            # 加入 extra snippets 讓內文更豐富
-            extra = " ".join(item.get("extra_snippets", []))
-            
-            combined_content += f"Article {i}:\n"
-            combined_content += f"Title: {title}\n"
-            combined_content += f"Source: {source}\n"
-            combined_content += f"Link: {url}\n"
-            combined_content += f"Content: {desc} {extra}\n"
-            combined_content += "-" * 40 + "\n\n"
+            combined_content += f"No.{i}: {title}\n"
+            combined_content += f"S:{source} | T:{age} | U:{url}\n"
+            combined_content += f"C: {desc}...\n"
+            combined_content += "-" * 10 + "\n"
 
         return {
             "title": f"Brave Search Daily Global News ({target_date})",

@@ -2,6 +2,10 @@
 配置模塊 - 包含所有配置信息和主題定義
 """
 import os
+from dotenv import load_dotenv
+
+# 自動加載 .env 檔案
+load_dotenv()
 
 # ============================================================================
 # API 配置
@@ -20,7 +24,7 @@ CLAUDE_MAX_TOKENS = 8192
 # Brave Search API 配置
 # ============================================================================
 BRAVE_API_KEY = os.getenv("BRAVE_API_KEY", "")
-BRAVE_SEARCH_QUERY = os.getenv("BRAVE_SEARCH_QUERY", "top trending global news")
+BRAVE_SEARCH_QUERY = os.getenv("BRAVE_SEARCH_QUERY", "top trending global news, Taiwan latest news, cryptocurrency blockchain regulation")
 
 # ============================================================================
 # 輸出配置
@@ -149,35 +153,35 @@ THEMES = {
 # 資訊分類定義
 # ============================================================================
 CATEGORIES = {
-    "model": {
-        "name": "模型發布",
-        "icon": "🤖",
-        "description": "新模型/版本更新/架構突破"
+    "world": {
+        "name": "國際要聞",
+        "icon": "🌎",
+        "description": "全球政治/外事/重大事件"
     },
-    "product": {
-        "name": "產品動態",
-        "icon": "💼",
-        "description": "新產品/功能/企業動態"
+    "finance": {
+        "name": "經濟財經",
+        "icon": "📈",
+        "description": "股市/匯市/宏觀經濟/商業動態"
     },
-    "research": {
-        "name": "研究論文",
-        "icon": "📚",
-        "description": "學術研究/技術突破/論文"
+    "tech": {
+        "name": "科技創新",
+        "icon": "🚀",
+        "description": "科技新品/AI/互聯網/未來技術"
     },
-    "tools": {
-        "name": "工具框架",
-        "icon": "🛠️",
-        "description": "開發工具/開源項目/SDK"
+    "lifestyle": {
+        "name": "社會生活",
+        "icon": "🏠",
+        "description": "社會新聞/生活方式/健康/環境"
     },
-    "funding": {
-        "name": "融資併購",
-        "icon": "💰",
-        "description": "投資/收購/IPO"
+    "sports": {
+        "name": "體育競技",
+        "icon": "⚽",
+        "description": "全球賽事/體壇明星/體制變動"
     },
-    "events": {
-        "name": "行業事件",
-        "icon": "🏆",
-        "description": "獎項/爭議/政策/監管"
+    "entertainment": {
+        "name": "娛樂影視",
+        "icon": "🎬",
+        "description": "電影/音樂/名人/文化"
     }
 }
 
@@ -185,12 +189,12 @@ CATEGORIES = {
 # 內容類型到主題的映射
 # ============================================================================
 CATEGORY_THEME_MAP = {
-    "model": "blue",      # 模型/框架/開發工具
-    "product": "indigo",   # 企業動態/產品發布
-    "funding": "teal",     # 融資/併購/金融
-    "tools": "blue",       # 開發工具
-    "research": "gray",    # 研究/論文/數據
-    "events": "orange",    # 熱點/爭議話題
+    "world": "indigo",      # 國際要聞
+    "finance": "teal",      # 經濟財經
+    "tech": "blue",         # 科技創新
+    "lifestyle": "green",   # 社會生活
+    "sports": "orange",     # 體育競技
+    "entertainment": "purple", # 娛樂影視
 }
 
 # ============================================================================
@@ -202,11 +206,11 @@ DEFAULT_THEME = "blue"
 # 網站元信息
 # ============================================================================
 SITE_META = {
-    "title": "AI Daily",
-    "subtitle": "AI 資訊日報",
-    "description": "每日 AI 前沿資訊，智能分類，快速掌握核心動態",
-    "author": "AI Daily",
-    "keywords": ["AI", "人工智慧", "機器學習", "深度學習", "資訊", "日報"]
+    "title": "Global Daily",
+    "subtitle": "全球熱門資訊日報",
+    "description": "每日全球前沿熱點，智能分類，快速掌握核心動態",
+    "author": "Global Daily",
+    "keywords": ["Global News", "全球資訊", "熱點日報", "每日新聞", "動態摘要"]
 }
 
 # ============================================================================

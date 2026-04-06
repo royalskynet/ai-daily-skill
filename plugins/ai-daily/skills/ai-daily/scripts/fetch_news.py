@@ -1,204 +1,109 @@
 #!/usr/bin/env python3
 """
-AI Daily News Fetcher
-Fetches AI news from smol.ai RSS and returns structured data.
+Global Daily News Fetcher (Brave Search Version)
+Fetches trending global news using Brave Search API.
 """
 import sys
 import json
 import argparse
+import os
+import requests
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 
-try:
-    import feedparser
-    import requests
-except ImportError:
-    print("Error: Required packages not installed.")
-    print("Run: pip install feedparser requests")
-    sys.exit(1)
+# Add project root to path to import config
+project_root = Path(__file__).parent.parent.parent.parent.parent
+sys.path.insert(0, str(project_root))
 
-# RSS URL
-RSS_URL = "https://news.smol.ai/rss.xml"
-REQUEST_TIMEOUT = 30
+from src.config import BRAVE_API_KEY, BRAVE_SEARCH_QUERY
 
+class BraveFetcher:
+    def __init__(self, api_key=None, query=None):
+        self.api_key = api_key or BRAVE_API_KEY
+        self.query = query or BRAVE_SEARCH_QUERY
+        self.base_url = "https://api.search.brave.com/res/v1/news/search"
 
-def fetch_rss():
-    """Download and parse RSS from smol.ai"""
-    try:
-        response = requests.get(RSS_URL, timeout=REQUEST_TIMEOUT)
-        response.raise_for_status()
-        return feedparser.parse(response.content)
-    except requests.RequestException as e:
-        print(json.dumps({"error": f"Failed to fetch RSS: {e}"}))
-        sys.exit(1)
+    def fetch(self):
+        if not self.api_key:
+            return {"error": "BRAVE_API_KEY_NOT_SET"}
+            
+        headers = {
+            "Accept": "application/json",
+            "X-Subscription-Token": self.api_key
+        }
+        
+        params = {
+            "q": self.query,
+            "count": 50,
+            "freshness": "pd",
+            "search_lang": "en",
+            "extra_snippets": 1
+        }
 
+        try:
+            response = requests.get(self.base_url, headers=headers, params=params, timeout=30)
+            response.raise_for_status()
+            return response.json()
+        except Exception as e:
+            return {"error": str(e)}
 
-def get_date_range(feed):
-    """Get available date range from RSS entries
+    def format_for_claude(self, data, target_date):
+        results = data.get("results", [])
+        if not results:
+            return None
 
-    Returns:
-        tuple: (min_date, max_date) in YYYY-MM-DD format, or (None, None)
-    """
-    dates = []
-    for entry in feed.entries:
-        # Method 1: Parse from link (format: .../issues/YY-MM-DD-...)
-        if hasattr(entry, 'link'):
-            date_from_link = extract_date_from_link(entry.link)
-            if date_from_link:
-                dates.append(date_from_link)
+        recent_results = []
+        for item in results:
+            age = str(item.get("age", "")).lower()
+            if not age: continue
+            is_recent = False
+            if any(x in age for x in ["min", "sec", "hour"]):
+                is_recent = True
+            elif "1 day" in age and "days" not in age:
+                is_recent = True
+            if is_recent:
+                recent_results.append(item)
+                
+        final_results = recent_results[:15] if recent_results else results[:15]
+        
+        combined_content = ""
+        for i, item in enumerate(final_results, 1):
+            title = item.get("title", "")
+            url = item.get("url", "")
+            desc = item.get("description", "")
+            source = item.get("meta_url", {}).get("hostname", "Unknown")
+            extra = " ".join(item.get("extra_snippets", []))
+            
+            combined_content += f"Article {i}:\nTitle: {title}\nSource: {source}\nLink: {url}\nContent: {desc} {extra}\n" + "-"*40 + "\n\n"
 
-        # Method 2: Parse from pubDate
-        elif hasattr(entry, 'published_parsed') and entry.published_parsed:
-            dt = datetime(*entry.published_parsed[:6], tzinfo=timezone.utc)
-            dates.append(dt.strftime("%Y-%m-%d"))
-
-    if not dates:
-        return None, None
-
-    return min(dates), max(dates)
-
-
-def extract_date_from_link(link):
-    """Extract date from RSS link
-
-    Args:
-        link: URL string like https://news.smol.ai/issues/26-01-13-not-much/
-
-    Returns:
-        Date string in YYYY-MM-DD format, or None
-    """
-    import re
-
-    patterns = [
-        r'/issues/(\d{2})-(\d{2})-(\d{2})-',  # YY-MM-DD
-        r'/issues/(\d{4})-(\d{2})-(\d{2})-',  # YYYY-MM-DD
-    ]
-
-    for pattern in patterns:
-        match = re.search(pattern, link)
-        if match:
-            year, month, day = match.groups()
-            if len(year) == 2:
-                year = "20" + year
-            return f"{year}-{month}-{day}"
-
-    return None
-
-
-def get_content_by_date(feed, target_date):
-    """Extract content for a specific date
-
-    Args:
-        feed: Feedparser parsed feed
-        target_date: Date string in YYYY-MM-DD format
-
-    Returns:
-        dict with keys: title, link, content, pubDate, or None if not found
-    """
-    for entry in feed.entries:
-        # Check by link date
-        if hasattr(entry, 'link'):
-            date_from_link = extract_date_from_link(entry.link)
-            if date_from_link and date_from_link == target_date:
-                return extract_entry_content(entry)
-
-        # Check by pubDate
-        if hasattr(entry, 'published_parsed') and entry.published_parsed:
-            dt = datetime(*entry.published_parsed[:6], tzinfo=timezone.utc)
-            entry_date = dt.strftime("%Y-%m-%d")
-            if entry_date == target_date:
-                return extract_entry_content(entry)
-
-    return None
-
-
-def extract_entry_content(entry):
-    """Extract content from an RSS entry
-
-    Returns:
-        dict with keys: title, link, content, pubDate
-    """
-    content = {
-        "title": entry.get("title", ""),
-        "link": entry.get("link", ""),
-        "pubDate": ""
-    }
-
-    # Get published date
-    if hasattr(entry, 'published'):
-        content["pubDate"] = entry.published
-
-    # Get full content
-    if hasattr(entry, 'content') and entry.content:
-        content["content"] = entry.content[0].get('value', '')
-    elif hasattr(entry, 'summary'):
-        content["content"] = entry.summary
-    else:
-        content["content"] = content.get("title", "")
-
-    # Clean HTML entities
-    content["content"] = content["content"].replace('&lt;', '<').replace('&gt;', '>').replace('&amp;', '&')
-
-    return content
-
+        return {
+            "title": f"Brave Search Daily Global News ({target_date})",
+            "link": "https://search.brave.com/",
+            "content": combined_content,
+            "pubDate": target_date
+        }
 
 def main():
-    parser = argparse.ArgumentParser(description='Fetch AI news from smol.ai')
-    parser.add_argument('--date-range', action='store_true', help='Show available date range')
-    parser.add_argument('--date', type=str, help='Get content for specific date (YYYY-MM-DD)')
-    parser.add_argument('--relative', type=str, choices=['yesterday', 'today', 'day-before'],
-                       help='Relative date: yesterday, today, day-before')
+    parser = argparse.ArgumentParser(description='Fetch Global News via Brave Search')
+    parser.add_argument('--date', type=str, help='Target date (YYYY-MM-DD)')
+    parser.add_argument('--relative', type=str, choices=['yesterday', 'today'], default='today')
 
     args = parser.parse_args()
 
-    # Fetch RSS
-    feed = fetch_rss()
+    fetcher = BraveFetcher()
+    raw_data = fetcher.fetch()
+    
+    if "error" in raw_data:
+        print(json.dumps(raw_data))
+        sys.exit(1)
 
-    # Date range mode
-    if args.date_range:
-        min_date, max_date = get_date_range(feed)
-        print(json.dumps({
-            "min_date": min_date,
-            "max_date": max_date,
-            "total_entries": len(feed.entries)
-        }, indent=2))
-        return
-
-    # Calculate target date
-    if args.relative:
-        if args.relative == 'yesterday':
-            target_date = (datetime.now(timezone.utc) - timedelta(days=1)).strftime("%Y-%m-%d")
-        elif args.relative == 'day-before':
-            target_date = (datetime.now(timezone.utc) - timedelta(days=2)).strftime("%Y-%m-%d")
-        else:  # today
-            target_date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-        date_arg = target_date
-    elif args.date:
-        target_date = args.date
-        date_arg = args.date
-    else:
-        # Default: yesterday
-        target_date = (datetime.now(timezone.utc) - timedelta(days=1)).strftime("%Y-%m-%d")
-        date_arg = target_date
-
-    # Get content
-    content = get_content_by_date(feed, target_date)
+    target_date = args.date or datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    content = fetcher.format_for_claude(raw_data, target_date)
 
     if content:
         print(json.dumps(content, indent=2, ensure_ascii=False))
     else:
-        # Return empty result with available range
-        min_date, max_date = get_date_range(feed)
-        print(json.dumps({
-            "error": "not_found",
-            "message": f"No content found for {target_date}",
-            "target_date": target_date,
-            "available_range": {
-                "min": min_date,
-                "max": max_date
-            }
-        }, indent=2))
-
+        print(json.dumps({"error": "no_results", "message": "No news found in the last 24h"}))
 
 if __name__ == "__main__":
     main()

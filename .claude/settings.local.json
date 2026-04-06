@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(.venv/Scripts/python plugins/ai-daily/skills/ai-daily/scripts/fetch_news.py --date-range)",
+      "Bash(.venv/Scripts/python plugins/ai-daily/skills/ai-daily/scripts/fetch_news.py --date 2026-04-03)",
+      "Bash(.venv/Scripts/python -c ':*)",
+      "Bash(PYTHONUTF8=1 BRAVE_API_KEY=BSAHaNRB-coczMMYOOat4uFhzfuvsWG .venv/Scripts/python src/main.py)",
+      "Bash(where claude:*)",
+      "Bash(.venv/Scripts/pip install:*)",
+      "Bash(PYTHONUTF8=1 .venv/Scripts/python src/main.py)"
+    ]
+  }
+}

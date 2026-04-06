@@ -78,7 +78,7 @@ class HTMLGenerator:
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI Daily · {date} - 暫無資訊</title>
+    <title>{SITE_META['title']} · {date} - 暫無資訊</title>
     <meta name="description" content="{SITE_META['description']}">
     <link rel="stylesheet" href="css/styles.css">
 </head>
@@ -89,7 +89,7 @@ class HTMLGenerator:
     <div class="container">
         <header class="header">
             <div class="logo-icon">🤖</div>
-            <h1>AI Daily</h1>
+            <h1>{SITE_META['title']}</h1>
             <div class="date-badge">{self._format_date(date)}</div>
         </header>
 
@@ -160,6 +160,7 @@ class HTMLGenerator:
                 item_title = item.get("title", "")
                 item_summary = item.get("summary", "")
                 item_url = item.get("url", "")
+                item_date = item.get("date", "")
                 item_tags = item.get("tags", [])
 
                 # 標籤
@@ -168,10 +169,15 @@ class HTMLGenerator:
                     tags_span = " ".join([f'<span class="tag">#{tag}</span>' for tag in item_tags[:4]])
                     tags_html = f'<div class="item-tags">{tags_span}</div>'
 
-                # 連結處理
+                # 連結與日期處理
                 link_html = ""
+                date_html = ""
+                if item_date:
+                    date_html = f'<span class="item-date-tag">{item_date}</span>'
                 if item_url:
-                    link_html = f'<a href="{item_url}" class="item-link" target="_blank" rel="noopener">詳情</a>'
+                    link_html = f'<div class="item-actions">{date_html}<a href="{item_url}" class="item-link" target="_blank" rel="noopener">詳情</a></div>'
+                else:
+                    link_html = f'<div class="item-actions">{date_html}</div>'
 
                 items_html += f"""
                 <article class="news-card">
@@ -213,7 +219,7 @@ class HTMLGenerator:
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI Daily · {formatted_date}</title>
+    <title>{SITE_META['title']} · {formatted_date}</title>
     <meta name="description" content="{SITE_META['description']}">
     <meta name="keywords" content="{', '.join(keywords + SITE_META['keywords'])}">
     <link rel="stylesheet" href="css/styles.css">
@@ -225,7 +231,7 @@ class HTMLGenerator:
     <div class="container">
         <header class="header">
             <div class="logo-icon">🤖</div>
-            <h1>AI Daily</h1>
+            <h1>{SITE_META['title']}</h1>
             <div class="date-badge">{formatted_date}</div>
         </header>
 
@@ -331,7 +337,7 @@ class HTMLGenerator:
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI Daily - AI 資訊日報</title>
+    <title>{SITE_META['title']} - {SITE_META['subtitle']}</title>
     <meta name="description" content="{SITE_META['description']}">
     <link rel="stylesheet" href="css/styles.css">
 </head>
@@ -342,7 +348,7 @@ class HTMLGenerator:
     <div class="container">
         <header class="header header-center">
             <div class="logo-icon">🤖</div>
-            <h1>AI Daily</h1>
+            <h1>{SITE_META['title']}</h1>
             <p class="subtitle">{SITE_META['subtitle']}</p>
         </header>
 
@@ -717,6 +723,22 @@ body {
     font-weight: 600;
     color: var(--title-color);
     flex: 1;
+}
+
+.item-actions {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    white-space: nowrap;
+}
+
+.item-date-tag {
+    font-size: 12px;
+    color: var(--secondary-color);
+    opacity: 0.7;
+    background: rgba(255, 255, 255, 0.05);
+    padding: 2px 8px;
+    border-radius: 4px;
 }
 
 .item-link {

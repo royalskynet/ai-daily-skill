@@ -13,7 +13,6 @@ project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
 from src.config import (
-    CLAUDE_API_KEY,
     OUTPUT_DIR,
     ENABLE_IMAGE_GENERATION,
     GITHUB_PAGES_URL
@@ -32,9 +31,9 @@ def print_banner():
     banner = """
 ╔════════════════════════════════════════════════════════════╗
 ║                                                              ║
-║   AI Daily - AI 資訊日報自動生成器                          ║
+║   Global Daily - 全球熱門資訊日報                            ║
 ║                                                              ║
-║   自動獲取全球重點新聞 · Claude 智能分析                    ║
+║   自動獲取全球熱點 · Claude 智能分析                        ║
 ║   精美 HTML 頁面 · 自動部署                                 ║
 ║                                                              ║
 ╚════════════════════════════════════════════════════════════╝
@@ -59,12 +58,6 @@ def get_target_date(days_offset: int = 2) -> str:
 def main():
     """主函數"""
     print_banner()
-
-    # 檢查環境變量
-    if not CLAUDE_API_KEY:
-        print("❌ 錯誤: CLAUDE_API_KEY 環境變量未設置")
-        print("   請設置 Claude 的 API Key")
-        sys.exit(1)
 
     # 初始化組件
     notifier = EmailNotifier()
